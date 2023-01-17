@@ -1,0 +1,140 @@
+version: '2.1'
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  mysql-data:
+
+configs:
+  grafana_config:
+    file: ./services/grafana/configs/grafana.ini
+  ldap_config:
+    file: ./services/grafana/configs/ldap.toml
+  mysql_config:
+    file: ./services/mysql/configs/my.cnf
+
+
+services:
+  mysql:
+    image: 'mysql:5.7'
+    container_name: 'mysql'
+    restart: 'always'
+    environment:
+      MYSQL_DATABASE: 'grafana'
+      MYSQL_USER: 'grafana'
+      MYSQL_PASSWORD: 'grafana'
+      MYSQL_ROOT_PASSWORD: 'grafana'
+    expose:
+      - '3306'
+    ports:
+      - '3306:3306'
+    volumes:
+      - type: 'volume'
+        source: 'mysql-data'
+        target: '/var/lib/mysql'
+      - type: 'bind'
+        source: './services/mysql/dbdump'
+        target: '/dbdump'
+    
+    configs:
+      - source: 'mysql_config'
+        target: '/etc/my.cnf'
+    networks:
+      - monitoring
+  
+  node_exporter:
+    image: 'prom/node-exporter:latest'
+    container_name: 'node-exporter'
+    restart: 'unless-stopped'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - 'collector.fylesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    expose:
+      - '9100'
+    ports:
+      - '9100:9100'
+    networks:
+      - monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes: 
+      - './services/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml'
+      - 'prometheus-data:/prometheus'
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.enable-lifecycle'
+    expose:
+      - '9090'
+    ports:
+      - '9090:9090'
+    networks:
+      - monitoring 
+  
+  grafana:
+    image: 'grafana/grafana-enterprise:9.3.2'
+    container_name: 'grafana'
+    restart: 'unless-stopped'
+    #command:
+      
+    volumes:
+      - type: 'bind'
+        source: './services/grafana/plugins'
+        target: '/grafana-plugins'
+    configs:
+      - source: 'grafana_config'
+        target: '/etc/grafana/grafana.ini'
+      - source: 'ldap_config'
+        target: '/etc/grafana/ldap.toml'
+    expose:
+      - 3000
+    ports:
+      - '3000:3000'
+    networks:
+      - monitoring
+  
+  loki:
+    image: 'grafana/loki:2.6.1'
+    container_name: 'loki'
+    command: -config.file=/etc/loki/local-config.yaml
+    expose:
+      - '3100'
+    ports:
+      - '3100:3100'
+    networks:
+      - monitoring
+  
+  promtail:
+    image: 'grafana/promtail:2.6.1'
+    container_name: 'promtail'
+    volumes:
+      - /var/log/:/var/log/
+      - ./services/promtail/config/config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    expose:
+      - '9080'
+    ports:
+      - '9080:9080'
+    networks:
+      - monitoring
+
+
+    
+    
+
+
+    
+
+    
