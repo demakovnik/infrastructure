@@ -70,7 +70,7 @@ services:
     restart: unless-stopped
     volumes: 
       - './services/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml'
-      - 'prometheus-data:/prometheus'
+      - 'prometheus_data:/prometheus'
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
